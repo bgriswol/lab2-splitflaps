@@ -10,8 +10,11 @@ const byte TEST = 5;
 const int FollowerAddress = 12;
 const int hallPin = 2;
 volatile bool startFound = false;
-String flap [] = {":)", ":(", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "!", "$", "%", "&", "*", "(", ")", "?", "+", "=", "/", "-"};
+//String flap [] = {":)", ":(", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "!", "$", "%", "&", "*", "(", ")", "?", "+", "=", "/", "-"};
 
+char flap[] = {'<', '.', '?', '!', '`', '-', '(', ')', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '^', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '>', '#', '@', '$', '%'};
+
+// first blank is <, second is >, third is (, fourth is )
 const int stepsPerIndex = 16; 
 const int stepsPerRevolution = 400; // This is the steps per revolution
 int currStep = 0; // tracks the current location of our stepper
@@ -22,7 +25,7 @@ bool completedCurrentState = false;
 bool ledTest = LOW;
 bool offset = false;
 
-char target = '';
+char target;
 
 enum FollowerState {
   Waiting,
@@ -52,18 +55,18 @@ void setup() {
 }
 
 void loop() {
-  switch (leaderState) {
+  switch (state) {
     case (Calibrating):
       stepper.step(stepsPerIndex);
       break;
     case (OffsetAndFinishCalibration):
-      stepper.step(stepsPerIndex*3);
+      stepper.step(stepsPerIndex*2);
       calibrated = true;
       completedCurrentState = true;
       state = Waiting;
       detachInterrupt(digitalPinToInterrupt(hallPin));
     case (SearchingForLetter):
-      moveToTarget(value);
+      moveToTarget();
       completedCurrentState = true;
       state = Waiting;
     case (Spinning):
@@ -89,12 +92,12 @@ void receiveEvent(int numBytes){
     }
     value = Wire.read();
     Serial.println(value);
-    switch(cmd) {
+    switch(command) {
       case CALIBRATE:
           calibrate();
           break;
       case GO_TO_LETTER:
-          goToLetter();
+          goToLetter(value);
           break;
       case MOVE_STEPS:
           moveBySteps();
@@ -111,10 +114,9 @@ void receiveEvent(int numBytes){
 
 void calibrate() { 
   state = Calibrating;
-  goCalibrate = true;
 }
 
-void goToLetter() {
+void goToLetter(char value) {
     state = SearchingForLetter;
     target = value;
 }
@@ -128,7 +130,7 @@ void toggleSpin() {
     state = Waiting;
   }
   else {
-    state = Spinning
+    state = Spinning;
   }
 }
 
@@ -141,29 +143,29 @@ void test() {
 }
 
 void moveToTarget() { 
-//  char target = Wire.read();
-//    int diff = 0; // defines the number of steps we need
-//    int targetFlap = 0; // defines index of target flap
-//
-//    for (int i = 0; i < 50; i++) {
-//        if (flap[i].equals(target)) {
-//          targetFlap = i; 
-//        }
-//    }
-//
-//    if (currFlap < targetFlap) {   // if current flap is earlier in array than target 
-//        diff = targetFlap - currFlap; // store difference 
-//
-//    } else if (currFlap > targetFlap) { // if current flap is later in array than target
-//        diff = 50 - currFlap + targetFlap;
-//        
-//    } else { // if letters are the same
-//        diff = 50; 
-//    }
-//
-//    currFlap = targetFlap; // resets currStep to our new location
-//
-//    stepper.step(-diff*stepsPerIndex); // moved backwards --> needed to make steps a negative 
+  char target = Wire.read();
+    int diff = 0; // defines the number of steps we need
+    int targetFlap = 0; // defines index of target flap
+
+    for (int i = 0; i < 50; i++) {
+        if (flap[i] == target) {
+          targetFlap = i; 
+        }
+    }
+
+    if (currFlap < targetFlap) {   // if current flap is earlier in array than target 
+        diff = targetFlap - currFlap; // store difference 
+
+    } else if (currFlap > targetFlap) { // if current flap is later in array than target
+        diff = 50 - currFlap + targetFlap;
+        
+    } else { // if letters are the same
+        diff = 50; 
+    }
+
+    currFlap = targetFlap; // resets currStep to our new location
+
+    stepper.step(diff*stepsPerIndex); // moved backwards --> needed to make steps a negative 
 }
 
 void hallSensorInterrupt() {

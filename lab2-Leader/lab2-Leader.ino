@@ -6,8 +6,10 @@ const byte MOVE_STEPS = 3;
 const byte SPIN = 4;
 const byte TEST = 5;
 
-const int numberOfFollowers = 5;
-const int followerAddresses[] = {8, 9, 10, 11, 12};
+//const int numberOfFollowers = 5;
+//const int followerAddresses[] = {8, 9, 10, 11, 12};
+const int numberOfFollowers = 2;
+const int followerAddresses[] = {10, 11};
 
 enum LeaderState {
   Initializing,
@@ -44,6 +46,7 @@ void loop() {
     case (CalibrateFollowers):
       sendCalibrate();
       leaderState = SendingReceiving;
+      delay(1000);
       break;
     case (SendingReceiving):
       sendCharacter();
@@ -54,25 +57,23 @@ void loop() {
 //        delay(2000); //delay between words
 //        wordCntr++;
 //      }
-//      break;
+      break;
   }
   delay(1000);
 }
 void sendCharacter() {
+  Serial.println("sending letter");
   for (int i = 0; i < numberOfFollowers; i++) {
     Wire.beginTransmission(followerAddresses[i]);
-    followerStates[i] = Calibrating;
+    followerStates[i] = SearchingForLetter;
     Wire.write(GO_TO_LETTER);
-    Wire.write('q');
+    Wire.write('A');
 //    Wire.write(poem[wordCntr].at(i));
     Wire.endTransmission();
   }
   int response = 0;
-  while (!followerStateContains(SearchingForLetter)) {
+  while (followerStateContains(SearchingForLetter)) {
     for (int i = 0; i < numberOfFollowers; i++) {
-      if (followerStates[i] = Waiting) {
-        continue;
-      }
       Wire.requestFrom(followerAddresses[i], answerSize);
       while (Wire.available()) {
         response = Wire.read();
@@ -82,6 +83,7 @@ void sendCharacter() {
       }
     }
   }
+  Serial.println("done sending letter");
 }
 
 void sendCalibrate() {
@@ -94,11 +96,11 @@ void sendCalibrate() {
     Wire.endTransmission();
   }
   int response = 0;
-  while (!followerStateContains(Calibrating)) {
+  while (followerStateContains(Calibrating)) { // will hang here until calibration is done for each follower
     for (int i = 0; i < numberOfFollowers; i++) {
-      if (followerStates[i] = Waiting) {
-        continue;
-      }
+//      if (followerStates[i] = Waiting) {
+//        continue;
+//      }
       Wire.requestFrom(followerAddresses[i], answerSize);
       while (Wire.available()) {
         response = Wire.read();
@@ -108,7 +110,7 @@ void sendCalibrate() {
       }
     }
   }
-  Serial.print("followers done calibrating");
+  Serial.println("followers done calibrating");
 }
 
 void sendSpin() {
