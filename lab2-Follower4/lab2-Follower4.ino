@@ -10,7 +10,7 @@ const int hallPin = 2;
 volatile bool startFound = false;
 String flap [] = {":)", ":(", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "!", "$", "%", "&", "*", "(", ")", "?", "+", "=", "/", "-"};
 
-const int stepsPerIndex = 32; 
+const int stepsPerIndex = 16; 
 const int stepsPerRevolution = 400; // This is the steps per revolution
 int currStep = 0; // tracks the current location of our stepper
 int currFlap = 0; 
@@ -19,14 +19,15 @@ bool completedCurrentState = false;
 
 bool ledTest = LOW;
 bool goCalibrate = false;
+bool offset = false;
 
 
-Stepper stepper(stepsPerRevolution, 3, 4);
+Stepper stepper(stepsPerRevolution, 4, 3);
 
 void setup() {
     // put your setup code here, to run once:
     pinMode(hallPin,INPUT_PULLUP); // original code used INPUT as 2nd parameter
-    stepper.setSpeed(31.0); // constant speed for stepper.
+    stepper.setSpeed(40.0); // constant speed for stepper.
     Wire.begin(FollowerAddress);
     Wire.onRequest(requestEvent); 
     Wire.onReceive(receiveEvent); 
@@ -42,7 +43,15 @@ void setup() {
 
 void loop() {
   if(goCalibrate) {
-    stepper.step(1);
+    stepper.step(stepsPerIndex);
+  }
+  if(offset) {
+//    stepper.step(stepsPerIndex*3);
+    offset = false;
+    completedCurrentState = true;
+    calibrated = true;
+//    delay(500);
+//    stepper.step(stepsPerIndex);
   }
 }
 
@@ -121,7 +130,6 @@ void moveToTarget(String target) {
 
 void hallSensorInterrupt() {
 //  detachInterrupt(digitalPinToInterrupt(hallPin));
-  completedCurrentState = true;
-  calibrated = true;
+  offset = true;
   goCalibrate = false;
 }

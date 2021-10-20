@@ -1,16 +1,18 @@
 #include <Wire.h>
 #include <Stepper.h>
 
-const int CALIBRATE = 1;
-const int GO_TO_LETTER = 2;
-const int TEST = 3;
+const byte CALIBRATE = 1;
+const byte GO_TO_LETTER = 2;
+const byte MOVE_STEPS = 3;
+const byte SPIN = 4;
+const byte TEST = 5;
 
 const int FollowerAddress = 12;
 const int hallPin = 2;
 volatile bool startFound = false;
 String flap [] = {":)", ":(", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "!", "$", "%", "&", "*", "(", ")", "?", "+", "=", "/", "-"};
 
-const int stepsPerIndex = 32; 
+const int stepsPerIndex = 16; 
 const int stepsPerRevolution = 400; // This is the steps per revolution
 int currStep = 0; // tracks the current location of our stepper
 int currFlap = 0; 
@@ -18,15 +20,25 @@ bool calibrated = false;
 bool completedCurrentState = false;
 
 bool ledTest = LOW;
-bool goCalibrate = false;
+bool offset = false;
 
+char target = '';
 
-Stepper stepper(stepsPerRevolution, 3, 4);
+enum FollowerState {
+  Waiting,
+  Calibrating,
+  OffsetAndFinishCalibration,
+  SearchingForLetter,
+  Spinning,
+};
+FollowerState state;
+
+Stepper stepper(stepsPerRevolution, 4, 3);
 
 void setup() {
     // put your setup code here, to run once:
     pinMode(hallPin,INPUT_PULLUP); // original code used INPUT as 2nd parameter
-    stepper.setSpeed(31.0); // constant speed for stepper.
+    stepper.setSpeed(40.0); // constant speed for stepper.
     Wire.begin(FollowerAddress);
     Wire.onRequest(requestEvent); 
     Wire.onReceive(receiveEvent); 
@@ -34,15 +46,28 @@ void setup() {
     pinMode(LED_BUILTIN, OUTPUT);
 
     Serial.begin(9600);
-//
     Serial.println("follower");
 
     attachInterrupt(digitalPinToInterrupt(hallPin), hallSensorInterrupt, RISING);
 }
 
 void loop() {
-  if(goCalibrate) {
-    stepper.step(1);
+  switch (leaderState) {
+    case (Calibrating):
+      stepper.step(stepsPerIndex);
+      break;
+    case (OffsetAndFinishCalibration):
+      stepper.step(stepsPerIndex*3);
+      calibrated = true;
+      completedCurrentState = true;
+      state = Waiting;
+      detachInterrupt(digitalPinToInterrupt(hallPin));
+    case (SearchingForLetter):
+      moveToTarget(value);
+      completedCurrentState = true;
+      state = Waiting;
+    case (Spinning):
+      stepper.step(stepsPerIndex);
   }
 }
 
@@ -55,24 +80,56 @@ void requestEvent() {
 }
 
 void receiveEvent(int numBytes){
-    completedCurrentState = false;
-    int cmd;
-    String value;
     Serial.println("received event");
-    while (0 < Wire.available()){
-        cmd = Wire.read();
-        switch(cmd) {
-            case TEST:
-                test();
-            case CALIBRATE:
-                calibrate();
-                break;
-            case GO_TO_LETTER:
-                value = Wire.read();
-                moveToTarget(value);
-                break;
-        }
+    completedCurrentState = false;
+    int command;
+    char value;
+    while (1 < Wire.available()){
+      command = Wire.read();
     }
+    value = Wire.read();
+    Serial.println(value);
+    switch(cmd) {
+      case CALIBRATE:
+          calibrate();
+          break;
+      case GO_TO_LETTER:
+          goToLetter();
+          break;
+      case MOVE_STEPS:
+          moveBySteps();
+          break;
+      case SPIN:
+          toggleSpin();
+      case TEST:
+          test();
+          break;
+      default:
+        break;
+    }
+}
+
+void calibrate() { 
+  state = Calibrating;
+  goCalibrate = true;
+}
+
+void goToLetter() {
+    state = SearchingForLetter;
+    target = value;
+}
+
+void moveBySteps() {
+//  stepper.step(value);
+}
+
+void toggleSpin() {
+  if(state == Spinning) {
+    state = Waiting;
+  }
+  else {
+    state = Spinning
+  }
 }
 
 void test() {
@@ -83,17 +140,8 @@ void test() {
   Serial.print("completed test");
 }
 
-void calibrate() { 
-//  Serial.println("calibrate follower");
-//    while (digitalRead(hallPin) == 1) {
-//        stepper.step(1); // keep moving 1 step at a time until sensor detects start position
-//    }
-//    calibrated = true;
-//    Serial.print("completed calibrate");
-  goCalibrate = true;
-}
-
-void moveToTarget(String target) { 
+void moveToTarget() { 
+//  char target = Wire.read();
 //    int diff = 0; // defines the number of steps we need
 //    int targetFlap = 0; // defines index of target flap
 //
@@ -118,10 +166,6 @@ void moveToTarget(String target) {
 //    stepper.step(-diff*stepsPerIndex); // moved backwards --> needed to make steps a negative 
 }
 
-
 void hallSensorInterrupt() {
-//  detachInterrupt(digitalPinToInterrupt(hallPin));
-  completedCurrentState = true;
-  calibrated = true;
-  goCalibrate = false;
+  state = OffsetAndFinishCalibration;
 }
