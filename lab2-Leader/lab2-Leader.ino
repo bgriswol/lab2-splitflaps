@@ -30,7 +30,10 @@ bool calibrated = false;
 const int answerSize = 1;
 int wordCntr = 0;
 
-String poem [] = {"The     ", "Robots  ", "Are     ", "Coming  "};
+//String poem [] = {"The     ", "Robots  ", "Are     ", "Coming  "};
+String poem = Serial.readString();
+String poemArray[sizeof(poem)] = {};
+int wordNum = 0;
 
 void setup() {
   for (int i = 0; i < sizeof(followerStates) / sizeof(followerStates[0]); i++) {
@@ -49,7 +52,10 @@ void loop() {
       delay(1000);
       break;
     case (SendingReceiving):
-      sendCharacter();
+      for (int a=0; a<wordNum; a++) {
+        sendCharacter(a);
+        delay(2000);
+      }
       leaderState = DoNothing;
 //      while (wordCntr < sizeof(poem) / sizeof(poem[0])) { // requires there to be at least one element in poem array
 //        sendMessages(/* send word as parameter? */);
@@ -67,8 +73,7 @@ void sendCharacter() {
     Wire.beginTransmission(followerAddresses[i]);
     followerStates[i] = SearchingForLetter;
     Wire.write(GO_TO_LETTER);
-    Wire.write('A');
-//    Wire.write(poem[wordCntr].at(i));
+    Wire.write(poemArray[wordNum].charAt(i));
     Wire.endTransmission();
   }
   int response = 0;
@@ -125,3 +130,57 @@ bool followerStateContains(FollowerState state) {
   }
   return false;
 }
+
+// Splitting up array below 
+
+String createPoemArray() {
+  boolean cont = true;
+  int wordLength = 0;
+   
+  while (cont) {
+     wordLength = lengthOfWord(poem, 0);
+     String newWord = poem.substring(0, wordLength-1);
+     if (newWord.length()<=8) {
+         int spaces = 8-newWord.length();
+         for (int s=0; s<spaces; s++) {
+             newWord = newWord + " ";
+         }
+         poemArray[wordNum] = newWord;
+         wordNum++;
+     } else {       
+         int revolutions = ceil(wordLength/7);
+         for (int b=0; b<revolutions; b++) {
+             if (newWord.length() > 8) {
+                 String w = newWord.substring(0, 6);
+                 newWord = newWord + "-";
+                 poemArray[wordNum] =  w;
+                 wordNum++;
+                 int wordLen = newWord.length();
+                 newWord = newWord.substring(6, wordLen);
+             } else {
+                 int spaces = 8-newWord.length();
+                 for (int s=0; s<spaces; s++) {
+                    newWord = newWord + " ";
+                  }
+                 poemArray[wordNum] = newWord;
+                 wordNum++;
+               }
+            }
+     }
+       int len = poem.length();
+       poem = poem.substring(wordLength+1, len);
+       if (poem.length()==0) {
+           cont = false;
+       }
+  }
+}
+ 
+int lengthOfWord(String poem, int num) {
+   if (!poem.charAt(num)==" ") {
+       num++;
+       lengthOfWord(poem, num);
+   } else {
+       return num;
+   }
+}
+ 
